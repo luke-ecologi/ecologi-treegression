@@ -1,0 +1,17 @@
+.graph-container {
+  display: inherit;
+  position: inherit;
+  flex-direction: column;
+  width: 80%;
+  height: 80%;
+  margin: 0 auto;
+}
+
+.graph-toolbar {
+  flex-direction: row;
+}
+
+.tree-chart {
+  width: 90%;
+  position: absolute;
+}

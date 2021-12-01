@@ -1,46 +1,62 @@
-# Getting Started with Create React App
+# Ecologi 'Treegression'
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+This is a single page React app built for the Ecologi full stack developer challenge.
 
-## Available Scripts
+## Getting started
 
-In the project directory, you can run:
+1. Clone the repository
+2. Install node modules: `npm i`
+3. To run a live-reloading server locally run `npm start` from the project root directory. This will run the app in development mode at [http://localhost:3000](http://localhost:3000).
 
-### `npm start`
+### Building
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+To create a production build run `npm build` from the project root directory.
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+### Linting & Prettier
 
-### `npm test`
+This project includes Prettier to consistently format the code.
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+# API
 
-### `npm run build`
+The data was requested from [https://public.ecologi.com/trees](https://public.ecologi.com/trees) as per the instructions, however the endpoint was a little slow to respond. I was also getting a lot of HTTP 504 errors from the endpoint.
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+In the interests of saving time, I saved a success response and used a short Python script to transform the data into a workable structure. In doing so I made the following assumptions:
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+- Each sub-array represented a single 'tree transaction' - i.e. a number of trees planted at a given UTC timestamp: `[treesPlanted, timeStamp]`.
+- I calculated the sum of all trees planted for that UTC day.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+I would probably aim to make an API response that looks more similar to the output I generated from the Python script (see `./src/api-request/transformedResponse.json`). This was the Python script I used:
 
-### `npm run eject`
+```python:
+import json
+import matplotlib.pyplot as plt
+import pandas as pd
+from datetime import date
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+f = open('./ecologiResponse.json')
+data = json.load(f)
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+tree_counts = {}
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+# Calculate tree count per unique timestamp
+for i, line in enumerate(data['data']):
+    if line[1] in tree_counts:
+        tree_counts[line[1]] += line[0]
+    else:
+        tree_counts[line[1]] = line[0]
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+df = pd.DataFrame({'timestamp': [date.fromtimestamp(int(t)) for t in tree_counts.keys()], 'count': tree_counts.values()})
 
-## Learn More
+df.timestamp = pd.to_datetime(df.timestamp)
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+df = df.reset_index().set_index('timestamp').resample('1D').sum()
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+df['timestamp'] = df.index
+df[['count', 'timestamp']].rename(columns={'count': 'treeCount'}).to_json('./transformedResponse.json', orient="records")
+```
+
+# Improvements!
+
+- Lots of improvements could be made to refine the UI - e.g. better axis labelling, improved tooltip etc
+- Could use query params in the URL to reflect current graph state.
+- Make live calls to the API!
